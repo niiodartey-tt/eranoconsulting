@@ -1,26 +1,31 @@
-'use client';
-
-import { useEffect } from 'react';
-import Cookies from 'js-cookie';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+'use client'
+import { useEffect, useState } from 'react'
 
 export default function Dashboard() {
-  const router = useRouter();
+  const [token, setToken] = useState<string | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    const token = Cookies.get('token');
-    if (!token) router.push('/login');
-  }, [router]);
+    setIsMounted(true) // ✅ ensures client-only render after hydration
+    const t = localStorage.getItem('access_token')
+    if (!t) {
+      window.location.href = '/login'
+    } else {
+      setToken(t)
+    }
+  }, [])
+
+  // 🧠 wait until client is mounted
+  if (!isMounted) return null
+
+  if (!token) return <p>Loading...</p>
 
   return (
-    <main className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
-      <h1 className="text-3xl font-bold text-blue-700 mb-4">Client Dashboard</h1>
-      <p className="text-gray-600 mb-6">Welcome to your secure Erano Consulting portal.</p>
-
-      <Link href="/kyc" className="text-blue-600 underline">
-        Upload KYC Documents
-      </Link>
+    <main className="p-8">
+      <h1 className="text-2xl font-bold text-blue-700">
+        Welcome to Erano Consulting Dashboard
+      </h1>
+      <p className="mt-2 text-gray-600">You are successfully logged in ✅</p>
     </main>
-  );
+  )
 }
