@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from app.utils import get_current_user
 from app.models import User
+from app import schemas, models
 
 router = APIRouter(prefix="/protected", tags=["Protected"])
 
@@ -41,3 +42,8 @@ async def some_protected_endpoint(current_user: User = Depends(get_current_user)
         },
         "data": {"example": "sensitive information here", "status": "success"},
     }
+
+
+@router.get("/me", response_model=schemas.UserOut)
+async def get_me(current_user: models.User = Depends(get_current_user)):
+    return current_user

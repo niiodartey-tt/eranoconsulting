@@ -1,39 +1,30 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
-  const router = useRouter();
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
-    setMessage('Logging in...');
+    setMessage('Registering...');
 
     try {
-      const body = new URLSearchParams();
-      body.append('username', email);
-      body.append('password', password);
-
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
 
       if (!res.ok) {
         const err = await res.json();
-        setMessage(`❌ ${err.detail || 'Login failed'}`);
+        setMessage(`Error: ${err.detail || 'Registration failed'}`);
         return;
       }
 
-      const data = await res.json();
-      localStorage.setItem('access_token', data.access_token);
-      setMessage('✅ Login successful!');
-      router.push('/dashboard');
+      setMessage('✅ Registration successful! You can now log in.');
     } catch (error) {
       console.error(error);
       setMessage('⚠️ Network error.');
@@ -43,9 +34,9 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-2xl shadow-lg w-96">
-        <h1 className="text-2xl font-bold text-center mb-4">Sign In</h1>
+        <h1 className="text-2xl font-bold text-center mb-4">Create Account</h1>
 
-        <form onSubmit={handleLogin} className="flex flex-col gap-4">
+        <form onSubmit={handleRegister} className="flex flex-col gap-4">
           <input
             type="email"
             placeholder="Email"
@@ -65,13 +56,13 @@ export default function LoginPage() {
           />
 
           <button type="submit" className="bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
-            Login
+            Register
           </button>
         </form>
 
         <p className="text-center mt-3 text-gray-600">{message}</p>
         <p className="text-center mt-2 text-sm">
-          No account? <a href="/register" className="text-blue-600">Register</a>
+          Already have an account? <a href="/login" className="text-blue-600">Login</a>
         </p>
       </div>
     </main>
