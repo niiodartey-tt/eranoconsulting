@@ -6,7 +6,7 @@ router = APIRouter(prefix="/protected", tags=["Protected"])
 
 
 @router.get("/")
-async def protected_route(current_user: User = Depends(get_current_user)):
+async def protected_route(current_user=Depends(get_current_user)):
     # Use getattr with fallback to handle different attribute names
     name = (
         getattr(current_user, "full_name", None)
@@ -16,7 +16,7 @@ async def protected_route(current_user: User = Depends(get_current_user)):
     )
 
     return {
-        "message": f"Hello {name}, you have accessed a protected route!",
+        "message": f"Hello {current_user.email}, you have accessed a protected route!",
         "email": current_user.email,
         "role": getattr(current_user, "role", "user"),
         "user_id": current_user.id,

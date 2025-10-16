@@ -64,9 +64,12 @@ class TokenWithRefresh(BaseModel):
     token_type: str = "bearer"
 
 
+# ✅ Messages section (replace your current Message classes with these)
+
+
 class MessageBase(BaseModel):
-    content: str
     receiver_id: int
+    content: str
 
 
 class MessageCreate(MessageBase):
@@ -78,7 +81,7 @@ class MessageOut(BaseModel):
     sender_id: int
     receiver_id: int
     content: str
-    timestamp: datetime
+    timestamp: datetime  # <-- align this with your DB column name (not timestamp)
 
     class Config:
         orm_mode = True

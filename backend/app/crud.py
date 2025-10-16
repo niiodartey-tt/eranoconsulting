@@ -140,3 +140,38 @@ async def authenticate_user(db, email: str, password: str):
         return None
 
     return user
+
+
+# backend/app/crud.py (add these near the end)
+
+from sqlalchemy import select
+from app import models, schemas
+
+
+async def create_message(db, message_in: schemas.MessageCreate, sender_id: int):
+    new_message = models.Message(
+        sender_id=sender_id,
+        receiver_id=message_in.receiver_id,
+        content=message_in.content,
+    )
+    db.add(new_message)
+    await db.commit()
+    await db.refresh(new_message)
+    return new_message
+
+
+async def get_user_messages(db, user_id: int):
+    result = await db.execute(
+        select(models.Message).where(
+            (models.Message.sender_id == user_id)
+            | (models.Message.receiver_id == user_id)
+        )
+    )
+    return result.scalars().all()
+
+
+async def get_message_by_id(db, message_id: int):
+    result = await db.execute(
+        select(models.Message).where(models.Message.id == message_id)
+    )
+    return result.scalar_one_or_none()
