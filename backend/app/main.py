@@ -1,46 +1,111 @@
-import os
-from fastapi import FastAPI
+# app/main.py
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from .db import init_db
-from .api import auth, onboarding, admin, messages, test_protected
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
+from contextlib import asynccontextmanager
+import redis.asyncio as redis
+import logging
+import uuid
+from app.core.config import settings
+from app.core.database import init_db
+from app.middleware.security import SecurityHeadersMiddleware, RateLimitMiddleware
+from app.api.v1 import auth, users, files, admin
+import uvicorn
 
-load_dotenv()
-
-app = FastAPI(title="Eranos Consulting API")
-
-# CORS setup
-cors_raw = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:3000,http://127.0.0.1:3000,"
-    "http://www.eranoconsultinggh.local,"
-    "http://clients.eranoconsultinggh.local,"
-    "http://admin.eranoconsultinggh.local",
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO if not settings.DEBUG else logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
-print("Loaded CORS origins:", origins)
+logger = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifecycle"""
+    logger.info("Starting application...")
+    
+    # Initialize database
+    await init_db()
+    
+    # Initialize Redis
+    if settings.REDIS_URL:
+        app.state.redis = await redis.from_url(
+            settings.REDIS_URL,
+            encoding="utf-8",
+            decode_responses=True
+        )
+    
+    yield
+    
+    # Cleanup
+    logger.info("Shutting down application...")
+    if hasattr(app.state, "redis"):
+        await app.state.redis.close()
+
+# Create FastAPI app
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.VERSION,
+    lifespan=lifespan,
+    docs_url="/api/docs" if settings.DEBUG else None,
+    redoc_url="/api/redoc" if settings.DEBUG else None,
+)
+
+# Add middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Include all routers
-app.include_router(auth.router, prefix="/auth", tags=["Auth"])
-app.include_router(onboarding.router, prefix="/onboarding", tags=["Onboarding"])
-app.include_router(admin.router, prefix="/admin", tags=["Admin"])
-app.include_router(messages.router, prefix="/messages", tags=["Messages"])
-app.include_router(test_protected.router)  # Already has prefix="/protected" in router
+# Add rate limiting if Redis is available
+if settings.REDIS_URL:
+    app.add_middleware(RateLimitMiddleware, redis_client=app.state.redis)
 
+# Request ID middleware
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request.state.request_id = str(uuid.uuid4())
+    response = await call_next(request)
+    return response
 
-@app.on_event("startup")
-async def startup():
-    await init_db()
+# Exception handlers
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "request_id": getattr(request.state, "request_id", None)
+        }
+    )
 
+# Include routers
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
+app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
+app.include_router(files.router, prefix="/api/v1/files", tags=["Files"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 
-@app.get("/")
-async def root():
-    return {"msg": "Eranos Consulting API (backend) - running"}
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "version": settings.VERSION
+    }
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=settings.DEBUG,
+        log_level="debug" if settings.DEBUG else "info",
+        access_log=True,
+    )
