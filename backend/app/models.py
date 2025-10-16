@@ -1,7 +1,10 @@
 # backend/app/models.py
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, declarative_base
+
+Base = declarative_base()
+from datetime import datetime, timezone
 from .db import Base
 
 
@@ -59,3 +62,16 @@ class RefreshToken(Base):
     revoked = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="refresh_tokens")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    receiver_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    sender = relationship("User", foreign_keys=[sender_id])
+    receiver = relationship("User", foreign_keys=[receiver_id])
