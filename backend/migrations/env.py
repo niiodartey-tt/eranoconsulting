@@ -5,20 +5,28 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-# --- Add backend/app to import path ---
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "app"))
+# Add the parent directory to the path so we can import from app
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-# --- Import your Base model ---
-from app.models import Base
-
-# --- Alembic Config ---
+# Alembic Config
 config = context.config
 
-# --- Logging setup ---
+# Logging setup
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# --- Important: Tell Alembic where metadata lives ---
+# ✅ Import Base from app.db (simple, no circular imports)
+from app.db import Base
+
+# ✅ Now import all your models so Alembic can detect them
+# These must come AFTER Base import to avoid circular imports
+from app.models.user import User
+from app.models.refresh_token import RefreshToken
+from app.models.uploaded_file import UploadedFile
+from app.models.message import Message
+from app.models.client import Client
+
+# Tell Alembic where metadata lives
 target_metadata = Base.metadata
 
 

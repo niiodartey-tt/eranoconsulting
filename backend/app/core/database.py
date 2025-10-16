@@ -32,6 +32,7 @@ async_session = async_sessionmaker(
     autoflush=False,
 )
 
+# ✅ Define Base here - DO NOT import it from anywhere
 Base = declarative_base()
 
 

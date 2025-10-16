@@ -1,7 +1,7 @@
 import os
 import secrets
 from typing import Optional, Any
-from pydantic import PostgresDsn, EmailStr, field_validator
+from pydantic import EmailStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: list[str] | str = "*"
 
-    # Database
-    DATABASE_URL: PostgresDsn
+    # Database - ✅ Changed from PostgresDsn to str
+    DATABASE_URL: str
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 40
     DATABASE_POOL_PRE_PING: bool = True
@@ -73,9 +73,12 @@ class Settings(BaseSettings):
 
     @field_validator("DATABASE_URL")
     def validate_database_url(cls, v):
-        if "sqlite" in str(v):
+        # Convert to string if it's a Pydantic URL object
+        v_str = str(v) if not isinstance(v, str) else v
+
+        if "sqlite" in v_str:
             raise ValueError("SQLite is not recommended for production")
-        return v
+        return v_str
 
     # ✅ Replaces `class Config` in Pydantic v2
     model_config = SettingsConfigDict(
