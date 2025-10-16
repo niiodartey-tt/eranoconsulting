@@ -18,11 +18,18 @@ export default function LoginPage() {
       body.append('username', email);
       body.append('password', password);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body,
-      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem("access_token", data.access_token);
+
+        // Decode the JWT to get the role
+        const payload = JSON.parse(atob(data.access_token.split(".")[1]));
+        const role = payload.role || "client";
+
+        if (role === "admin") router.push("/admin/dashboard");
+        else if (role === "staff") router.push("/staff/dashboard");
+        else router.push("/client/dashboard");
+      }
 
       if (!res.ok) {
         const err = await res.json();
