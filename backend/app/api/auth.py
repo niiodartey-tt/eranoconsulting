@@ -10,14 +10,35 @@ from app.db import get_db
 router = APIRouter()
 
 
-@router.post("/register")
-async def register_user(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
-    existing = await crud.get_user_by_email(db, user.email)
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+# @router.post("/register")
+# async def register_user(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
+#     existing = await crud.get_user_by_email(db, user.email)
+#     if existing:
+#         raise HTTPException(status_code=400, detail="Email already registered")
 
-    new_user = await crud.create_user(db, user)
-    return {"msg": "User registered successfully", "user": new_user.email}
+#     new_user = await crud.create_user(db, user, user.password, role=role)
+#     return {
+#         "msg": f"{role.capitalize()} registered successfully",
+#         "user": new_user.email,
+#     }
+
+
+@router.post("/register/admin")
+async def register_admin(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
+    new_user = await crud.create_user(db, user, user.password, role="admin")
+    return {"msg": "Admin registered successfully", "user": new_user.email}
+
+
+@router.post("/register/staff")
+async def register_staff(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
+    new_user = await crud.create_user(db, user, user.password, role="staff")
+    return {"msg": "Staff registered successfully", "user": new_user.email}
+
+
+@router.post("/register/client")
+async def register_client(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
+    new_user = await crud.create_user(db, user, user.password, role="client")
+    return {"msg": "Client registered successfully", "user": new_user.email}
 
 
 @router.post("/login")

@@ -49,11 +49,11 @@ async def create_user(
     db: AsyncSession, email: str, password: str, role: str = "client"
 ):
     hashed = utils.hash_password(password)
-    user = models.User(email=email, hashed_password=hashed, role=role)
+    user = models.User(email=user.email, hashed_password=hashed, role=role)
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    return user
+    return new_user
 
 
 async def create_client_for_user(
