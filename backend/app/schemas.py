@@ -62,3 +62,23 @@ class TokenWithRefresh(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+
+
+class MessageBase(BaseModel):
+    content: str
+    receiver_id: int
+
+
+class MessageCreate(MessageBase):
+    pass
+
+
+class MessageOut(BaseModel):
+    id: int
+    sender_id: int
+    receiver_id: int
+    content: str
+    timestamp: datetime
+
+    class Config:
+        orm_mode = True

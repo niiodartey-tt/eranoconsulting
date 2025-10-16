@@ -1,16 +1,15 @@
-# backend/app/main.py
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from .db import init_db
-from .api import auth, onboarding, admin
+from .api import auth, onboarding, admin, messages, test_protected
 
 load_dotenv()
 
 app = FastAPI(title="Eranos Consulting API")
 
-# ✅ SINGLE, stable CORS setup for local + custom domains
+# CORS setup
 cors_raw = os.getenv(
     "CORS_ORIGINS",
     "http://localhost:3000,http://127.0.0.1:3000,"
@@ -25,14 +24,16 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # allows POST, GET, OPTIONS, etc.
-    allow_headers=["*"],  # allows Authorization, Content-Type, etc.
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# ✅ Routers
-app.include_router(auth.router)
-app.include_router(onboarding.router)
-app.include_router(admin.router)
+# Include all routers
+app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+app.include_router(onboarding.router, prefix="/onboarding", tags=["Onboarding"])
+app.include_router(admin.router, prefix="/admin", tags=["Admin"])
+app.include_router(messages.router, prefix="/messages", tags=["Messages"])
+app.include_router(test_protected.router)  # Already has prefix="/protected" in router
 
 
 @app.on_event("startup")

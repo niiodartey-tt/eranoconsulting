@@ -3,8 +3,10 @@ from sqlalchemy.future import select
 from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from . import models, utils
+from .models import Message
 from datetime import datetime
 from .models import RefreshToken, User
+from app.utils import verify_password
 
 
 async def get_user_by_id(db: AsyncSession, user_id: int):
@@ -100,3 +102,41 @@ async def save_file_record(
     await db.commit()
     await db.refresh(rec)
     return rec
+
+
+async def create_message(db, sender_id: int, receiver_id: int, content: str):
+    msg = Message(sender_id=sender_id, receiver_id=receiver_id, content=content)
+    db.add(msg)
+    await db.commit()
+    await db.refresh(msg)
+    return msg
+
+
+async def get_conversation(db, user_a: int, user_b: int):
+    q = (
+        select(Message)
+        .where(
+            ((Message.sender_id == user_a) & (Message.receiver_id == user_b))
+            | ((Message.sender_id == user_b) & (Message.receiver_id == user_a))
+        )
+        .order_by(Message.timestamp.asc())
+    )
+    res = await db.execute(q)
+    return res.scalars().all()
+
+
+async def authenticate_user(db, email: str, password: str):
+    """Authenticate user by email and password"""
+    from app.models import User
+
+    q = select(User).where(User.email == email)
+    result = await db.execute(q)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        return None
+
+    if not verify_password(password, user.hashed_password):
+        return None
+
+    return user
