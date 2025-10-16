@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import (
     AsyncSession,
     create_async_engine,
     AsyncEngine,
-    async_sessionmaker
+    async_sessionmaker,
 )
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
@@ -34,6 +34,7 @@ async_session = async_sessionmaker(
 
 Base = declarative_base()
 
+
 async def get_db() -> AsyncSession:
     """Dependency to get database session"""
     async with async_session() as session:
@@ -46,6 +47,7 @@ async def get_db() -> AsyncSession:
             raise
         finally:
             await session.close()
+
 
 async def init_db():
     """Initialize database"""
