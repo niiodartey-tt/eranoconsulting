@@ -10,6 +10,7 @@ import uuid
 from app.core.config import settings
 from app.core.database import init_db
 from app.middleware.security import SecurityHeadersMiddleware, RateLimitMiddleware
+from app.api.v1 import auth, users, files, admin, messages, onboarding
 
 # from app.api.v1 import auth
 
@@ -98,6 +99,7 @@ app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(files.router, prefix="/api/v1/files", tags=["Files"])
 app.include_router(messages.router, prefix="/api/v1/messages", tags=["Messages"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(onboarding.router, prefix="/api/v1/onboarding", tags=["Onboarding"])
 
 
 @app.get("/health")
