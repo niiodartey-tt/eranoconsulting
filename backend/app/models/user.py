@@ -54,7 +54,7 @@ class User(BaseModel):
     last_login = Column(DateTime(timezone=True), nullable=True)
     password_changed_at = Column(DateTime(timezone=True), nullable=True)
 
-    # Relationships
+    # Relationships - FIXED with explicit foreign_keys
     refresh_tokens = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
     )
@@ -62,13 +62,26 @@ class User(BaseModel):
         "UploadedFile", back_populates="user", cascade="all, delete-orphan"
     )
     sent_messages = relationship(
-        "Message", foreign_keys="Message.sender_id", back_populates="sender"
+        "Message",
+        foreign_keys="Message.sender_id",
+        back_populates="sender",
+        cascade="all, delete-orphan",
     )
     received_messages = relationship(
-        "Message", foreign_keys="Message.receiver_id", back_populates="receiver"
+        "Message",
+        foreign_keys="Message.receiver_id",
+        back_populates="receiver",
+        cascade="all, delete-orphan",
     )
+
+    # ✅ FIX: Explicitly specify which foreign key to use for client relationship
     client = relationship(
-        "Client", back_populates="user", uselist=False, cascade="all, delete-orphan"
+        "Client",
+        foreign_keys="Client.user_id",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+        single_parent=True,
     )
 
     @validates("email")
