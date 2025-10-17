@@ -10,9 +10,10 @@ import uuid
 from app.core.config import settings
 from app.core.database import init_db
 from app.middleware.security import SecurityHeadersMiddleware, RateLimitMiddleware
-from app.api.v1 import auth
 
-# from app.api.v1 import auth, users, files, admin
+# from app.api.v1 import auth
+
+from app.api.v1 import auth, users, files, admin
 import uvicorn
 
 # Configure logging
@@ -93,9 +94,9 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
-# app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
-# app.include_router(files.router, prefix="/api/v1/files", tags=["Files"])
-# app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
+app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
+app.include_router(files.router, prefix="/api/v1/files", tags=["Files"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 
 
 @app.get("/health")
