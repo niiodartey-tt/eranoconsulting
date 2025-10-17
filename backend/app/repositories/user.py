@@ -1,12 +1,13 @@
-# app/repositories/user.py
+"""User repository for database operations"""
 from typing import Optional, List
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select
 from app.repositories.base import BaseRepository
 from app.models.user import User, UserRole
 from app.core.security import SecurityService
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 class UserRepository(BaseRepository[User]):
     """Repository for user operations"""
@@ -21,56 +22,55 @@ class UserRepository(BaseRepository[User]):
         """Create new user with hashed password"""
         hashed_password = SecurityService.hash_password(password)
         
-        return await self.create(
-            email=email,
+        user = User(
+            email=email.lower(),
             hashed_password=hashed_password,
             full_name=full_name,
             role=role
         )
+        
+        self.db.add(user)
+        await self.db.commit()
+        await self.db.refresh(user)
+        
+        return user
     
     async def get_by_email(self, email: str) -> Optional[User]:
         """Get user by email"""
-        return await self.get_by(email=email.lower())
+        query = select(User).where(User.email == email.lower())
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
     
     async def authenticate(self, email: str, password: str) -> Optional[User]:
-        """Authenticate user"""
+        """Authenticate user by email and password"""
         user = await self.get_by_email(email)
         
         if not user:
             return None
         
+        # Check for account lockout
         if user.failed_login_attempts >= 5:
             logger.warning(f"Account locked for user {email}")
             return None
         
+        # Verify password
         if not SecurityService.verify_password(password, user.hashed_password):
-            await self.update(
-                user.id,
-                failed_login_attempts=user.failed_login_attempts + 1
-            )
+            # Increment failed attempts
+            user.failed_login_attempts += 1
+            await self.db.commit()
             return None
         
         # Reset failed attempts on successful login
-        from datetime import datetime
-        await self.update(
-            user.id,
-            failed_login_attempts=0,
-            last_login=datetime.utcnow()
-        )
+        from datetime import datetime, timezone as tz
+        user.failed_login_attempts = 0
+        user.last_login = datetime.now(tz.utc)
+        await self.db.commit()
+        await self.db.refresh(user)
         
         return user
     
     async def list_by_role(self, role: UserRole) -> List[User]:
         """List users by role"""
-        return await self.list(filters={"role": role})
-    
-    async def search(self, query: str) -> List[User]:
-        """Search users by email or name"""
-        stmt = select(User).where(
-            or_(
-                User.email.ilike(f"%{query}%"),
-                User.full_name.ilike(f"%{query}%")
-            )
-        )
-        result = await self.db.execute(stmt)
+        query = select(User).where(User.role == role)
+        result = await self.db.execute(query)
         return result.scalars().all()
