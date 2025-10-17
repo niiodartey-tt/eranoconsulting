@@ -3,535 +3,413 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-const KYC_DOCUMENTS = [
-  { type: 'rgd_certificate', label: 'Certificate of Incorporation (RGD)', required: true },
-  { type: 'tin_certificate', label: 'TIN Certificate', required: true },
-  { type: 'vat_certificate', label: 'VAT Certificate', required: false },
-  { type: 'ssnit_proof', label: 'SSNIT Registration Proof', required: true },
-  { type: 'ghana_card', label: 'Ghana Card (Director)', required: true },
-  { type: 'proof_of_address', label: 'Proof of Address (Utility Bill)', required: true },
-];
-
-const PAYMENT_INFO = {
-  bank: 'GCB Bank',
-  accountName: 'Eranos Consulting Services',
-  accountNumber: '1234567890',
-  branch: 'Accra Main Branch',
-  amount: 5150.00,
-  currency: 'GHS',
-};
-
-interface UploadedDoc {
-  type: string;
-  file: File;
-  preview?: string;
-  status?: 'pending' | 'uploading' | 'uploaded' | 'error';
-  id?: number;
+interface UploadedDocument {
+  id: number;
+  document_type: string;
+  document_name: string;
+  file_size: number;
+  uploaded_at: string;
+  verification_status: string;
 }
 
-export default function ClientOnboarding() {
+const REQUIRED_DOCUMENTS = [
+  { type: 'rgd_certificate', label: 'Certificate of Incorporation (RGD)', description: 'Company registration certificate from Registrar General' },
+  { type: 'tin_certificate', label: 'TIN Certificate', description: 'Tax Identification Number certificate' },
+  { type: 'ghana_card', label: 'Ghana Card', description: 'National ID of director/owner' },
+];
+
+const OPTIONAL_DOCUMENTS = [
+  { type: 'vat_certificate', label: 'VAT Certificate', description: 'Value Added Tax registration (if applicable)' },
+  { type: 'ssnit_proof', label: 'SSNIT Registration Proof', description: 'Social Security registration' },
+  { type: 'proof_of_address', label: 'Proof of Address', description: 'Utility bill or bank statement' },
+  { type: 'passport', label: 'Passport', description: 'Alternative to Ghana Card' },
+];
+
+export default function KYCUploadWizard() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
+  const [uploadedDocs, setUploadedDocs] = useState<UploadedDocument[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [token, setToken] = useState('');
-  
-  // Step 1: Business Info
-  const [businessInfo, setBusinessInfo] = useState({
-    businessName: '',
-    tinNumber: '',
-    vatNumber: '',
-    ssnitNumber: '',
-  });
-
-  // Step 2: KYC Documents
-  const [kycDocuments, setKycDocuments] = useState<UploadedDoc[]>([]);
-  const [uploadingKyc, setUploadingKyc] = useState(false);
-
-  // Step 3: Payment
-  const [paymentData, setPaymentData] = useState({
-    amount: PAYMENT_INFO.amount,
-    paymentMethod: 'bank_transfer',
-    paymentReference: '',
-    description: 'Initial Deposit',
-  });
-  const [paymentReceipt, setPaymentReceipt] = useState<File | null>(null);
-  const [uploadingPayment, setUploadingPayment] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState('');
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    if (!storedToken) {
-      router.push('/login');
-      return;
-    }
-    setToken(storedToken);
-  }, [router]);
+    fetchUploadedDocuments();
+  }, []);
 
-  const handleFileSelect = (type: string, file: File) => {
-    // Validate file
-    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-    if (!validTypes.includes(file.type)) {
-      setError('Only PDF and image files are allowed');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setError('File size must be less than 10MB');
-      return;
-    }
-
-    setError('');
-
-    // Create preview for images
-    let preview: string | undefined;
-    if (file.type.startsWith('image/')) {
-      preview = URL.createObjectURL(file);
-    }
-
-    // Add or update document
-    setKycDocuments(prev => {
-      const existing = prev.find(doc => doc.type === type);
-      if (existing) {
-        return prev.map(doc => 
-          doc.type === type 
-            ? { ...doc, file, preview, status: 'pending' as const }
-            : doc
-        );
-      }
-      return [...prev, { type, file, preview, status: 'pending' as const }];
-    });
-  };
-
-  const uploadKycDocument = async (doc: UploadedDoc) => {
-    setUploadingKyc(true);
-    
+  const fetchUploadedDocuments = async () => {
     try {
-      const formData = new FormData();
-      formData.append('file', doc.file);
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('http://localhost:8000/api/v1/onboarding/kyc/documents', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
 
-      const response = await fetch(
-        `http://localhost:8000/api/v1/onboarding/kyc/upload?document_type=${doc.type}`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
+      if (response.ok) {
+        const data = await response.json();
+        setUploadedDocs(data);
       }
-
-      const data = await response.json();
-
-      // Update status
-      setKycDocuments(prev =>
-        prev.map(d => d.type === doc.type ? { ...d, status: 'uploaded' as const, id: data.id } : d)
-      );
-
-      return true;
     } catch (err) {
-      setKycDocuments(prev =>
-        prev.map(d => d.type === doc.type ? { ...d, status: 'error' as const } : d)
-      );
-      return false;
-    } finally {
-      setUploadingKyc(false);
+      console.error('Error fetching documents:', err);
     }
   };
 
-  const uploadAllKycDocuments = async () => {
-    setUploadingKyc(true);
+  const handleFileUpload = async (documentType: string, file: File) => {
     setError('');
-
-    const pendingDocs = kycDocuments.filter(doc => doc.status === 'pending');
-
-    for (const doc of pendingDocs) {
-      await uploadKycDocument(doc);
-    }
-
-    setUploadingKyc(false);
-  };
-
-  const handlePaymentUpload = async () => {
-    if (!paymentReceipt) {
-      setError('Please upload payment receipt');
-      return;
-    }
-
-    setUploadingPayment(true);
-    setError('');
+    setUploadingDoc(documentType);
 
     try {
+      const token = localStorage.getItem('access_token');
       const formData = new FormData();
-      formData.append('receipt_file', paymentReceipt);
+      formData.append('file', file);
 
       const response = await fetch(
-        `http://localhost:8000/api/v1/onboarding/payment/upload?` +
-        `amount=${paymentData.amount}&` +
-        `payment_method=${paymentData.paymentMethod}&` +
-        `payment_reference=${encodeURIComponent(paymentData.paymentReference)}&` +
-        `description=${encodeURIComponent(paymentData.description)}`,
+        `http://localhost:8000/api/v1/onboarding/kyc/upload?document_type=${documentType}`,
         {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: { 'Authorization': `Bearer ${token}` },
           body: formData,
         }
       );
 
       if (!response.ok) {
-        throw new Error('Payment upload failed');
+        const data = await response.json();
+        throw new Error(data.detail || 'Upload failed');
       }
 
-      // Move to completion step
-      setCurrentStep(4);
+      await fetchUploadedDocuments();
     } catch (err: any) {
-      setError(err.message || 'Payment upload failed');
+      setError(err.message || 'Upload failed');
     } finally {
-      setUploadingPayment(false);
+      setUploadingDoc('');
     }
   };
 
-  const isStepComplete = (step: number) => {
-    switch (step) {
-      case 1:
-        return businessInfo.businessName && businessInfo.tinNumber;
-      case 2:
-        const requiredDocs = KYC_DOCUMENTS.filter(d => d.required);
-        const uploadedRequired = requiredDocs.every(doc =>
-          kycDocuments.some(uploaded => uploaded.type === doc.type && uploaded.status === 'uploaded')
-        );
-        return uploadedRequired;
-      case 3:
-        return paymentReceipt !== null;
-      default:
-        return false;
-    }
+  const isDocumentUploaded = (docType: string) => {
+    return uploadedDocs.some(doc => doc.document_type === docType);
   };
 
-  const renderStepIndicator = () => (
-    <div className="flex items-center justify-center mb-8">
-      {[1, 2, 3, 4].map((step) => (
-        <div key={step} className="flex items-center">
-          <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-              currentStep === step
-                ? 'bg-blue-600 text-white'
-                : currentStep > step
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-300 text-gray-600'
-            }`}
-          >
-            {currentStep > step ? '✓' : step}
-          </div>
-          {step < 4 && (
-            <div className={`w-20 h-1 ${currentStep > step ? 'bg-green-600' : 'bg-gray-300'}`} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
+  const getDocumentStatus = (docType: string) => {
+    return uploadedDocs.find(doc => doc.document_type === docType);
+  };
 
-  const renderStep1 = () => (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Business Information</h2>
-      <p className="text-gray-600">Please provide your business details for verification</p>
+  const allRequiredUploaded = REQUIRED_DOCUMENTS.every(doc => isDocumentUploaded(doc.type));
 
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Business Name *</label>
-          <input
-            type="text"
-            value={businessInfo.businessName}
-            onChange={(e) => setBusinessInfo({ ...businessInfo, businessName: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            placeholder="ABC Company Ltd"
-          />
-        </div>
+  const handleSubmitForReview = async () => {
+    if (!allRequiredUploaded) {
+      setError('Please upload all required documents');
+      return;
+    }
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">TIN Number *</label>
-          <input
-            type="text"
-            value={businessInfo.tinNumber}
-            onChange={(e) => setBusinessInfo({ ...businessInfo, tinNumber: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            placeholder="C0000000000"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">VAT Number (if applicable)</label>
-          <input
-            type="text"
-            value={businessInfo.vatNumber}
-            onChange={(e) => setBusinessInfo({ ...businessInfo, vatNumber: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            placeholder="VAT-000000"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">SSNIT Number</label>
-          <input
-            type="text"
-            value={businessInfo.ssnitNumber}
-            onChange={(e) => setBusinessInfo({ ...businessInfo, ssnitNumber: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            placeholder="SSNIT-000000"
-          />
-        </div>
-      </div>
-
-      <button
-        onClick={() => setCurrentStep(2)}
-        disabled={!isStepComplete(1)}
-        className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-gray-400"
-      >
-        Continue to KYC Documents
-      </button>
-    </div>
-  );
-
-  const renderStep2 = () => (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">KYC Documents</h2>
-      <p className="text-gray-600">Upload the required documents for verification</p>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-          {error}
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {KYC_DOCUMENTS.map((doc) => {
-          const uploaded = kycDocuments.find(d => d.type === doc.type);
-          
-          return (
-            <div key={doc.type} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <h3 className="font-medium text-gray-900">{doc.label}</h3>
-                  {doc.required && <span className="text-xs text-red-600">* Required</span>}
-                </div>
-                {uploaded && (
-                  <span className={`text-xs px-2 py-1 rounded ${
-                    uploaded.status === 'uploaded' ? 'bg-green-100 text-green-800' :
-                    uploaded.status === 'error' ? 'bg-red-100 text-red-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {uploaded.status}
-                  </span>
-                )}
-              </div>
-
-              {uploaded ? (
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-600 flex-1">{uploaded.file.name}</span>
-                  {uploaded.status === 'pending' && (
-                    <button
-                      onClick={() => uploadKycDocument(uploaded)}
-                      className="text-blue-600 text-sm hover:underline"
-                    >
-                      Upload
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setKycDocuments(prev => prev.filter(d => d.type !== doc.type))}
-                    className="text-red-600 text-sm hover:underline"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ) : (
-                <label className="block">
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => e.target.files && handleFileSelect(doc.type, e.target.files[0])}
-                    className="hidden"
-                  />
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-blue-500 transition">
-                    <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-                    <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG (Max 10MB)</p>
-                  </div>
-                </label>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="flex gap-4">
-        <button
-          onClick={() => setCurrentStep(1)}
-          className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
-        >
-          Back
-        </button>
-        {kycDocuments.some(d => d.status === 'pending') && (
-          <button
-            onClick={uploadAllKycDocuments}
-            disabled={uploadingKyc}
-            className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:bg-gray-400"
-          >
-            {uploadingKyc ? 'Uploading...' : 'Upload All Pending'}
-          </button>
-        )}
-        <button
-          onClick={() => setCurrentStep(3)}
-          disabled={!isStepComplete(2)}
-          className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-gray-400"
-        >
-          Continue to Payment
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderStep3 = () => (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Payment Information</h2>
-      <p className="text-gray-600">Complete your payment and upload the receipt</p>
-
-      {/* Bank Details */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Bank Transfer Details</h3>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Bank:</span>
-            <span className="font-medium">{PAYMENT_INFO.bank}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Account Name:</span>
-            <span className="font-medium">{PAYMENT_INFO.accountName}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Account Number:</span>
-            <span className="font-medium">{PAYMENT_INFO.accountNumber}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Branch:</span>
-            <span className="font-medium">{PAYMENT_INFO.branch}</span>
-          </div>
-          <div className="flex justify-between border-t pt-2 mt-2">
-            <span className="text-gray-600">Amount:</span>
-            <span className="font-bold text-lg">{PAYMENT_INFO.currency} {PAYMENT_INFO.amount.toLocaleString()}</span>
-          </div>
-        </div>
-      </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 text-sm">
-          {error}
-        </div>
-      )}
-
-      {/* Payment Form */}
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Payment Reference *</label>
-          <input
-            type="text"
-            value={paymentData.paymentReference}
-            onChange={(e) => setPaymentData({ ...paymentData, paymentReference: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            placeholder="Transaction reference number"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Upload Payment Receipt *</label>
-          {paymentReceipt ? (
-            <div className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg">
-              <span className="text-sm text-gray-600 flex-1">{paymentReceipt.name}</span>
-              <button
-                onClick={() => setPaymentReceipt(null)}
-                className="text-red-600 text-sm hover:underline"
-              >
-                Remove
-              </button>
-            </div>
-          ) : (
-            <label className="block">
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => e.target.files && setPaymentReceipt(e.target.files[0])}
-                className="hidden"
-              />
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 transition">
-                <svg className="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <p className="text-sm text-gray-600">Click to upload payment receipt</p>
-                <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG (Max 10MB)</p>
-              </div>
-            </label>
-          )}
-        </div>
-      </div>
-
-      <div className="flex gap-4">
-        <button
-          onClick={() => setCurrentStep(2)}
-          className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
-        >
-          Back
-        </button>
-        <button
-          onClick={handlePaymentUpload}
-          disabled={!isStepComplete(3) || uploadingPayment}
-          className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:bg-gray-400"
-        >
-          {uploadingPayment ? 'Uploading...' : 'Submit Payment'}
-        </button>
-      </div>
-    </div>
-  );
-
-  const renderStep4 = () => (
-    <div className="text-center py-8">
-      <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-        <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-      </div>
-      <h2 className="text-3xl font-bold text-gray-900 mb-4">Onboarding Complete!</h2>
-      <p className="text-gray-600 mb-2">
-        Your documents and payment have been submitted successfully.
-      </p>
-      <p className="text-gray-600 mb-8">
-        Our team will review your submission within 1-2 business days.
-      </p>
-      <button
-        onClick={() => router.push('/client/dashboard')}
-        className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
-      >
-        Go to Dashboard
-      </button>
-    </div>
-  );
+    setLoading(true);
+    try {
+      // Just redirect to dashboard - the guard will show pending status
+      router.push('/client/dashboard');
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-white rounded-lg shadow-xl p-8">
-          {renderStepIndicator()}
-          
-          {currentStep === 1 && renderStep1()}
-          {currentStep === 2 && renderStep2()}
-          {currentStep === 3 && renderStep3()}
-          {currentStep === 4 && renderStep4()}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">KYC Document Upload</h1>
+          <p className="text-gray-600 text-lg">Upload required documents to complete your onboarding</p>
         </div>
+
+        {/* Progress Steps */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+          <div className="flex items-center justify-between">
+            {[1, 2, 3].map((step) => (
+              <div key={step} className="flex items-center flex-1">
+                <div className={`flex items-center justify-center w-12 h-12 rounded-full font-bold text-lg ${
+                  currentStep >= step ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
+                }`}>
+                  {step}
+                </div>
+                {step < 3 && (
+                  <div className={`flex-1 h-2 mx-4 rounded ${
+                    currentStep > step ? 'bg-blue-600' : 'bg-gray-200'
+                  }`} />
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between mt-4">
+            <span className="text-sm font-bold text-gray-700">Required Documents</span>
+            <span className="text-sm font-bold text-gray-700">Optional Documents</span>
+            <span className="text-sm font-bold text-gray-700">Review & Submit</span>
+          </div>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-6 flex items-start gap-3">
+            <svg className="w-6 h-6 text-red-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-red-800 font-semibold">{error}</p>
+          </div>
+        )}
+
+        {/* Step 1: Required Documents */}
+        {currentStep === 1 && (
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Step 1: Required Documents</h2>
+            <p className="text-gray-600 mb-6 font-medium">Please upload the following required documents (PDF or images only, max 10MB)</p>
+
+            <div className="space-y-6">
+              {REQUIRED_DOCUMENTS.map((doc) => {
+                const uploaded = getDocumentStatus(doc.type);
+                return (
+                  <div key={doc.type} className="border-2 border-gray-200 rounded-lg p-6 hover:border-blue-300 transition">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">{doc.label}</h3>
+                        <p className="text-sm text-gray-600 font-medium">{doc.description}</p>
+                      </div>
+                      {uploaded && (
+                        <div className="ml-4">
+                          {uploaded.verification_status === 'pending' && (
+                            <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-bold">
+                              ⏳ Pending Review
+                            </span>
+                          )}
+                          {uploaded.verification_status === 'approved' && (
+                            <span className="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-bold">
+                              ✓ Approved
+                            </span>
+                          )}
+                          {uploaded.verification_status === 'rejected' && (
+                            <span className="inline-block px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-bold">
+                              ✗ Rejected
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {uploaded ? (
+                      <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <div>
+                            <p className="font-bold text-green-900">{uploaded.document_name}</p>
+                            <p className="text-sm text-green-700 font-medium">
+                              {(uploaded.file_size / 1024).toFixed(1)} KB • Uploaded {new Date(uploaded.uploaded_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <label className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold">
+                          Replace
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload(doc.type, file);
+                            }}
+                          />
+                        </label>
+                      </div>
+                    ) : (
+                      <label className="block cursor-pointer">
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 hover:bg-blue-50 transition">
+                          {uploadingDoc === doc.type ? (
+                            <div className="flex flex-col items-center">
+                              <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mb-4"></div>
+                              <p className="text-blue-600 font-bold text-lg">Uploading...</p>
+                            </div>
+                          ) : (
+                            <>
+                              <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                              </svg>
+                              <p className="text-gray-600 font-bold text-lg mb-2">Click to upload or drag and drop</p>
+                              <p className="text-sm text-gray-500 font-medium">PDF, JPG, PNG (max 10MB)</p>
+                            </>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          disabled={uploadingDoc === doc.type}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleFileUpload(doc.type, file);
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end mt-8">
+              <button
+                onClick={() => setCurrentStep(2)}
+                disabled={!allRequiredUploaded}
+                className="px-8 py-3 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed shadow-lg"
+              >
+                Next: Optional Documents →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Optional Documents */}
+        {currentStep === 2 && (
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Step 2: Optional Documents</h2>
+            <p className="text-gray-600 mb-6 font-medium">Upload additional documents if applicable (you can skip this step)</p>
+
+            <div className="space-y-6">
+              {OPTIONAL_DOCUMENTS.map((doc) => {
+                const uploaded = getDocumentStatus(doc.type);
+                return (
+                  <div key={doc.type} className="border-2 border-gray-200 rounded-lg p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">{doc.label}</h3>
+                        <p className="text-sm text-gray-600 font-medium">{doc.description}</p>
+                      </div>
+                      {uploaded && (
+                        <span className="ml-4 inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-bold">
+                          ✓ Uploaded
+                        </span>
+                      )}
+                    </div>
+
+                    {uploaded ? (
+                      <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <p className="font-bold text-green-900">{uploaded.document_name}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="block cursor-pointer">
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 hover:bg-blue-50 transition">
+                          {uploadingDoc === doc.type ? (
+                            <div className="flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-8 w-8 border-b-4 border-blue-600 mr-3"></div>
+                              <p className="text-blue-600 font-bold">Uploading...</p>
+                            </div>
+                          ) : (
+                            <p className="text-gray-600 font-bold">Click to upload</p>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          disabled={uploadingDoc === doc.type}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleFileUpload(doc.type, file);
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-between mt-8">
+              <button
+                onClick={() => setCurrentStep(1)}
+                className="px-8 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-bold text-lg hover:bg-gray-50"
+              >
+                ← Back
+              </button>
+              <button
+                onClick={() => setCurrentStep(3)}
+                className="px-8 py-3 bg-blue-600 text-white rounded-lg font-bold text-lg hover:bg-blue-700 shadow-lg"
+              >
+                Next: Review & Submit →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Review & Submit */}
+        {currentStep === 3 && (
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Step 3: Review & Submit</h2>
+
+            {/* Summary */}
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-6">
+              <h3 className="font-bold text-blue-900 text-lg mb-4">Document Summary</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-blue-800 font-medium">Required Documents:</p>
+                  <p className="text-2xl font-bold text-blue-900">{uploadedDocs.filter(d => REQUIRED_DOCUMENTS.some(r => r.type === d.document_type)).length} / {REQUIRED_DOCUMENTS.length}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-blue-800 font-medium">Optional Documents:</p>
+                  <p className="text-2xl font-bold text-blue-900">{uploadedDocs.filter(d => OPTIONAL_DOCUMENTS.some(o => o.type === d.document_type)).length}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Uploaded Documents List */}
+            <div className="space-y-3 mb-8">
+              <h3 className="font-bold text-gray-900 text-lg mb-4">Uploaded Documents</h3>
+              {uploadedDocs.map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-2 border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <p className="font-bold text-gray-900">{doc.document_name}</p>
+                      <p className="text-sm text-gray-600 font-medium">{doc.document_type.replace(/_/g, ' ').toUpperCase()}</p>
+                    </div>
+                  </div>
+                  <span className="text-sm text-gray-500 font-medium">{(doc.file_size / 1024).toFixed(1)} KB</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Info Box */}
+            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6 mb-8">
+              <h4 className="font-bold text-yellow-900 mb-3 text-lg">📋 What Happens Next?</h4>
+              <ol className="list-decimal list-inside space-y-2 text-yellow-900 font-medium">
+                <li>Your documents will be reviewed by our admin team (1-2 business days)</li>
+                <li>You'll receive email notifications about the review status</li>
+                <li>After approval, you'll need to submit your payment</li>
+                <li>Once payment is verified, your account will be activated</li>
+              </ol>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-between">
+              <button
+                onClick={() => setCurrentStep(2)}
+                className="px-8 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-bold text-lg hover:bg-gray-50"
+              >
+                ← Back
+              </button>
+              <button
+                onClick={handleSubmitForReview}
+                disabled={loading || !allRequiredUploaded}
+                className="px-8 py-3 bg-green-600 text-white rounded-lg font-bold text-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed shadow-lg"
+              >
+                {loading ? 'Submitting...' : 'Submit for Review ✓'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
