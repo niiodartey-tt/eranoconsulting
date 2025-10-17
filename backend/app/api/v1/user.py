@@ -9,13 +9,12 @@ from app.models.user import User
 from app.schemas.user import UserOut, UserUpdate
 from app.repositories.user import UserRepository
 
+
 router = APIRouter()
 
 
 @router.get("/me", response_model=UserOut)
-async def get_current_user_info(
-    current_user: User = Depends(get_current_user)
-):
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
     """Get current user information"""
     return current_user
 
@@ -24,11 +23,11 @@ async def get_current_user_info(
 async def update_current_user(
     user_update: UserUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Update current user information"""
     user_repo = UserRepository(User, db)
-    
+
     # Update fields
     if user_update.full_name is not None:
         current_user.full_name = user_update.full_name
@@ -37,11 +36,10 @@ async def update_current_user(
         existing = await user_repo.get_by_email(user_update.email)
         if existing and existing.id != current_user.id:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already in use"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Email already in use"
             )
         current_user.email = user_update.email
-    
+
     await db.commit()
     await db.refresh(current_user)
     return current_user
@@ -52,7 +50,7 @@ async def list_users(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    _admin: User = Depends(get_current_admin)
+    _admin: User = Depends(get_current_admin),
 ):
     """List all users (Admin only)"""
     user_repo = UserRepository(User, db)
@@ -64,18 +62,17 @@ async def list_users(
 async def get_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    _admin: User = Depends(get_current_admin)
+    _admin: User = Depends(get_current_admin),
 ):
     """Get user by ID (Admin only)"""
     user_repo = UserRepository(User, db)
     user = await user_repo.get(user_id)
-    
+
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-    
+
     return user
 
 
@@ -83,17 +80,16 @@ async def get_user(
 async def delete_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    _admin: User = Depends(get_current_admin)
+    _admin: User = Depends(get_current_admin),
 ):
     """Delete user (Admin only)"""
     user_repo = UserRepository(User, db)
     user = await user_repo.get(user_id)
-    
+
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-    
+
     await user_repo.delete(user_id)
     return None

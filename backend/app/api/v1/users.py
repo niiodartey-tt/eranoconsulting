@@ -5,18 +5,18 @@ from typing import List
 
 from app.core.deps import get_db, get_current_user, get_current_admin
 from app.models.user import User
-from app.schemas.user import UserResponse, UserUpdate
+from app.schemas.user import UserOut, UserUpdate
 
 router = APIRouter()
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserOut)
 async def get_current_user_info(
     current_user: User = Depends(get_current_user)
 ):
     """Get current user information"""
     return current_user
 
-@router.put("/me", response_model=UserResponse)
+@router.put("/me", response_model=UserOut)
 async def update_current_user(
     user_update: UserUpdate,
     current_user: User = Depends(get_current_user),
@@ -34,7 +34,7 @@ async def update_current_user(
     
     return current_user
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("/", response_model=List[UserOut])
 async def list_users(
     skip: int = 0,
     limit: int = 100,
@@ -51,7 +51,7 @@ async def list_users(
     
     return users
 
-@router.get("/{user_id}", response_model=UserResponse)
+@router.get("/{user_id}", response_model=UserOut)
 async def get_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
