@@ -1,4 +1,4 @@
-# app/models/user.py
+"""User model with authentication and authorization"""
 from sqlalchemy import (
     Column,
     String,
@@ -9,7 +9,6 @@ from sqlalchemy import (
     DateTime,
     UniqueConstraint,
     CheckConstraint,
-    Text,
 )
 from sqlalchemy.orm import relationship, validates
 import enum
@@ -18,12 +17,16 @@ from app.models.base import BaseModel
 
 
 class UserRole(str, enum.Enum):
+    """User role enumeration"""
+
     ADMIN = "admin"
     STAFF = "staff"
     CLIENT = "client"
 
 
 class User(BaseModel):
+    """User model for authentication and authorization"""
+
     __tablename__ = "users"
     __table_args__ = (
         UniqueConstraint("email", name="uq_user_email"),
@@ -36,13 +39,18 @@ class User(BaseModel):
         {"extend_existing": True},
     )
 
+    # Core fields
     email = Column(String(255), nullable=False, unique=True, index=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=True)
     role = Column(Enum(UserRole), default=UserRole.CLIENT, nullable=False, index=True)
+
+    # Status fields
     is_active = Column(Boolean, default=True, nullable=False, index=True)
     is_verified = Column(Boolean, default=False, nullable=False)
     failed_login_attempts = Column(Integer, default=0, nullable=False)
+
+    # Audit fields
     last_login = Column(DateTime(timezone=True), nullable=True)
     password_changed_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -59,9 +67,16 @@ class User(BaseModel):
     received_messages = relationship(
         "Message", foreign_keys="Message.receiver_id", back_populates="receiver"
     )
+    client = relationship(
+        "Client", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
 
     @validates("email")
     def validate_email(self, key, email):
+        """Validate and normalize email"""
         if not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email):
             raise ValueError("Invalid email format")
         return email.lower()
+
+    def __repr__(self):
+        return f"<User(id={self.id}, email='{self.email}', role='{self.role.value}')>"
