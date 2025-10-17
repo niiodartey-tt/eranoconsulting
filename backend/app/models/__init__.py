@@ -2,6 +2,7 @@
 
 # ✅ CRITICAL: Import base and enums FIRST
 from app.models.base import BaseModel
+from app.models.document import Document
 
 # Import enums
 from app.models.enums import (
@@ -43,4 +44,5 @@ __all__ = [
     "DocumentType",
     "VerificationStatus",
     "ServiceType",
+    "Document",
 ]
