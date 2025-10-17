@@ -1,0 +1,33 @@
+{
+  "name": "@eranos/shared",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^4.32.0",
+    "axios": "^1.4.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.45.0",
+    "zod": "^3.21.0",
+    "zustand": "^4.4.0"
+  },
+  "devDependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@types/node": "^24.8.1",
+    "@types/react": "^18.2.0",
+    "isomorphic-dompurify": "^2.29.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@hookform/resolvers": "^3.0.0",
+    "isomorphic-dompurify": "^2.0.0",
+    "next": "^13.0.0 || ^14.0.0"
+  }
+}

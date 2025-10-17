@@ -1,21 +1,40 @@
-"""
-Models package initialization
-Exports all models for easy importing
-"""
+"""Models package - Import all models for Alembic auto-detection"""
+
+# Import base first
+from app.models.base import BaseModel
+
+# Import enums
+from app.models.enums import (
+    OnboardingStatus,
+    DocumentType,
+    VerificationStatus,
+    ServiceType,
+)
+
+# Import all models
 from app.models.user import User, UserRole
 from app.models.refresh_token import RefreshToken
 from app.models.message import Message
 from app.models.uploaded_file import UploadedFile
 from app.models.client import Client
-from app.models.base import BaseModel, Base
+from app.models.kyc_document import KYCDocument
+from app.models.payment import Payment
+from app.models.engagement_letter import EngagementLetter
 
+# Export all models for easy imports
 __all__ = [
+    "BaseModel",
     "User",
     "UserRole",
     "RefreshToken",
     "Message",
     "UploadedFile",
     "Client",
-    "BaseModel",
-    "Base",
+    "KYCDocument",
+    "Payment",
+    "EngagementLetter",
+    "OnboardingStatus",
+    "DocumentType",
+    "VerificationStatus",
+    "ServiceType",
 ]
