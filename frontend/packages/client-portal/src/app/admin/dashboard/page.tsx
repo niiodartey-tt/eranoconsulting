@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Messages from '../../client/dashboard/components/Messages';
+import PendingRegistrations from './components/PendingRegistrations';
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
