@@ -100,12 +100,13 @@ export default function KYCUploadWizard() {
       return;
     }
 
-    setLoading(true);
+  setLoading(true);
     try {
       // Just redirect to dashboard - the guard will show pending status
       router.push('/client/dashboard');
     } catch (err: any) {
       setError(err.message);
+    } finally {
       setLoading(false);
     }
   };

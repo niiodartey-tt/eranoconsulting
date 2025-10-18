@@ -238,7 +238,7 @@ export default function PendingRegistrations() {
                 <h3 className="text-xl font-bold text-gray-900">
                   {actionType === 'approve' ? 'Approve' : 'Reject'} Registration
                 </h3>
-                <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+                <button onClick={closeModal} disabled={approving} className="text-gray-400 hover:text-gray-600">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -311,6 +311,7 @@ export default function PendingRegistrations() {
                     <button
                       onClick={closeModal}
                       className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                      disabled={approving} // ADD THIS LINE
                     >
                       Cancel
                     </button>

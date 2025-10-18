@@ -356,7 +356,7 @@ async def get_kyc_review_queue(
 async def verify_kyc_document(
     document_id: int,
     verification: VerifyKYCDocumentRequest,
-    db: AsyncSession = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),  # CORRECT
     admin: User = Depends(get_current_admin),
 ):
     """Step 5: Admin verifies KYC document"""
@@ -390,7 +390,7 @@ async def verify_kyc_document(
         )
         pending_count = result.scalar()
 
-        if pending_count == 0:
+        if pending_count == 1:  # This is the last one being approved
             client.onboarding_status = "kyc_review"
 
     await db.commit()

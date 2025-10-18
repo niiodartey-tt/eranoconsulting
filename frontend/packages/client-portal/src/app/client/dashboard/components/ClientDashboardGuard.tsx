@@ -25,15 +25,29 @@ export default function ClientDashboardGuard({ children }: { children: React.Rea
   const checkOnboardingStatus = async () => {
     try {
       const token = localStorage.getItem('access_token');
-      const passwordChanged = localStorage.getItem('password_changed');
-
-      // Check if password needs to be changed
-      if (!passwordChanged) {
-        router.push('/client/change-password');
+      
+      // Decode token to check user role
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const userRole = payload.role;
+      
+      // PASSWORD CHANGE CHECK ONLY FOR CLIENTS
+      if (userRole === 'client') {
+        const passwordChanged = localStorage.getItem('password_changed');
+        
+        // Check if password needs to be changed
+        if (!passwordChanged) {
+          router.push('/client/change-password');
+          return;
+        }
+      }
+      
+      // For admin/staff, skip password check and onboarding check
+      if (userRole === 'admin' || userRole === 'staff') {
+        setLoading(false);
         return;
       }
 
-      // Check onboarding status
+      // Check onboarding status (CLIENT ONLY)
       const response = await fetch('http://localhost:8000/api/v1/onboarding/onboarding-status', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -47,13 +61,11 @@ export default function ClientDashboardGuard({ children }: { children: React.Rea
 
       // Redirect based on status
       if (data.onboarding_status === 'pre_active' || data.onboarding_status === 'kyc_submission') {
-        // Needs to upload KYC
         router.push('/client/onboarding');
         return;
       }
 
       if (data.onboarding_status !== 'active') {
-        // Show inactive dashboard
         setShowInactive(true);
       }
 
