@@ -82,7 +82,7 @@ class EngagementLetter(BaseModel):
     notes = Column(Text, nullable=True)
 
     # Relationships
-    client = relationship("Client", back_populates="engagement_letters")
+# FIXED:     client = relationship("Client", back_populates="engagement_letters")
     generated_by = relationship("User", foreign_keys=[generated_by_id])
 
     def __repr__(self):

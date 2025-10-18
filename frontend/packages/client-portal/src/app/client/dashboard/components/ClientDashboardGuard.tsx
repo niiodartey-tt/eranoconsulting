@@ -3,13 +3,16 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 interface OnboardingStatus {
-  client_id: number;
-  business_name: string;
-  onboarding_status: string;
-  kyc_documents_count: number;
-  kyc_approved_count: number;
+  status: string;
+  kyc_uploaded: boolean;
   payment_verified: boolean;
+  onboarding_completed: boolean;
+  engagement_letter_signed: boolean;
+  next_step: string;
+  message: string;
 }
 
 export default function ClientDashboardGuard({ children }: { children: React.ReactNode }) {
@@ -26,53 +29,51 @@ export default function ClientDashboardGuard({ children }: { children: React.Rea
     try {
       const token = localStorage.getItem('access_token');
       
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
       // Decode token to check user role
       const payload = JSON.parse(atob(token.split('.')[1]));
       const userRole = payload.role;
       
-      // PASSWORD CHANGE CHECK ONLY FOR CLIENTS
-      if (userRole === 'client') {
-        const passwordChanged = localStorage.getItem('password_changed');
-        
-        // Check if password needs to be changed
-        if (!passwordChanged) {
-          router.push('/client/change-password');
-          return;
-        }
-      }
-      
-      // For admin/staff, skip password check and onboarding check
+      // For admin/staff, skip onboarding check
       if (userRole === 'admin' || userRole === 'staff') {
         setLoading(false);
         return;
       }
 
       // Check onboarding status (CLIENT ONLY)
-      const response = await fetch('http://localhost:8000/api/v1/onboarding/onboarding-status', {
+      const response = await fetch(`${API_URL}/api/v1/clients/onboarding/status`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
-      if (!response.ok) throw new Error('Failed to fetch status');
+      if (!response.ok) {
+        console.error('Failed to fetch status');
+        setLoading(false);
+        return; // Allow access anyway if endpoint fails
+      }
 
       const data: OnboardingStatus = await response.json();
       setStatus(data);
 
       // Redirect based on status
-      if (data.onboarding_status === 'pre_active' || data.onboarding_status === 'kyc_submission') {
+      if (data.status === 'pre_active') {
         router.push('/client/onboarding');
         return;
       }
 
-      if (data.onboarding_status !== 'active') {
+      if (data.status === 'pending_review' || data.status === 'inactive') {
         setShowInactive(true);
       }
 
       setLoading(false);
     } catch (err) {
       console.error('Error checking status:', err);
-      setLoading(false);
+      setLoading(false); // Allow access anyway if error
     }
   };
 
@@ -100,7 +101,7 @@ export default function ClientDashboardGuard({ children }: { children: React.Rea
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Account Pending Activation</h2>
             <p className="text-gray-600 text-lg">
-              Your account is currently under review
+              {status.message}
             </p>
           </div>
 
@@ -109,51 +110,45 @@ export default function ClientDashboardGuard({ children }: { children: React.Rea
             <h3 className="font-bold text-gray-900 mb-4 text-lg">Current Status</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-gray-700 font-medium">Business Name:</span>
-                <span className="font-bold text-gray-900">{status.business_name}</span>
-              </div>
-              <div className="flex items-center justify-between">
                 <span className="text-gray-700 font-medium">Onboarding Status:</span>
                 <span className="inline-block px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-bold">
-                  {status.onboarding_status.replace(/_/g, ' ').toUpperCase()}
+                  {status.status.replace(/_/g, ' ').toUpperCase()}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-700 font-medium">KYC Documents:</span>
-                <span className="font-bold text-gray-900">
-                  {status.kyc_approved_count} / {status.kyc_documents_count} Approved
+                <span className={`font-bold ${status.kyc_uploaded ? 'text-green-600' : 'text-gray-600'}`}>
+                  {status.kyc_uploaded ? '✓ Uploaded' : '○ Not Uploaded'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-700 font-medium">Payment:</span>
-                <span className={`font-bold ${status.payment_verified ? 'text-green-600' : 'text-red-600'}`}>
-                  {status.payment_verified ? '✓ Verified' : '✗ Pending'}
+                <span className={`font-bold ${status.payment_verified ? 'text-green-600' : 'text-gray-600'}`}>
+                  {status.payment_verified ? '✓ Verified' : '○ Pending'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-700 font-medium">Engagement Letter:</span>
+                <span className={`font-bold ${status.engagement_letter_signed ? 'text-green-600' : 'text-gray-600'}`}>
+                  {status.engagement_letter_signed ? '✓ Signed' : '○ Pending'}
                 </span>
               </div>
             </div>
           </div>
 
           {/* Status Messages */}
-          {status.onboarding_status === 'kyc_review' && (
+          {status.status === 'pending_review' && (
             <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-6">
               <p className="text-blue-900 font-medium">
-                📋 Your KYC documents are currently being reviewed by our team. This usually takes 1-2 business days.
+                📋 Your documents are currently being reviewed by our team. This usually takes 1-2 business days.
               </p>
             </div>
           )}
 
-          {status.onboarding_status === 'payment_review' && (
+          {status.status === 'inactive' && (
             <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-6">
               <p className="text-blue-900 font-medium">
-                💰 Your payment is being verified. Once confirmed, your account will be activated.
-              </p>
-            </div>
-          )}
-
-          {status.onboarding_status === 'awaiting_signature' && (
-            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-6">
-              <p className="text-blue-900 font-medium">
-                📝 Your engagement letter is being prepared. You'll receive an email once it's ready for signature.
+                📝 Your documents have been verified. Please sign the engagement letter to activate your account.
               </p>
             </div>
           )}

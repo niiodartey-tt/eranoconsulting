@@ -15,9 +15,11 @@ from app.middleware.security import SecurityHeadersMiddleware, RateLimitMiddlewa
 from app.api.v1 import auth, users, files, admin, messages
 
 # Import new routers for the fixes
+from app.api.v1 import onboarding
+from app.api.v1 import onboarding
 from app.api.v1.client_onboarding import router as onboarding_router
 from app.api.v1.admin_users import router as admin_users_router
-
+from app.api.v1 import client_onboarding
 import uvicorn
 
 logging.basicConfig(
@@ -86,11 +88,10 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(files.router, prefix="/api/v1/files", tags=["files"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
+app.include_router(onboarding.router, prefix="/api/v1/onboarding", tags=["onboarding"])
 app.include_router(messages.router, prefix="/api/v1/messages", tags=["messages"])
-
-# Include new routers for fixes
 app.include_router(
-    onboarding_router, prefix="/api/v1/clients/onboarding", tags=["onboarding"]
+    onboarding_router, prefix="/api/v1/clients/onboarding", tags=["Client Onboarding"]
 )
 app.include_router(admin_users_router, prefix="/api/v1/admin", tags=["admin-users"])
 

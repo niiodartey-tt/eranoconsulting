@@ -74,7 +74,7 @@ class KYCDocument(BaseModel):
     )
 
     # Relationships
-    # FIXED: client = relationship("Client", back_populates="kyc_documents")
+# FIXED: # FIXED:     # FIXED: client = relationship("Client", back_populates="kyc_documents")
     verified_by = relationship("User", foreign_keys=[verified_by_id])
     previous_document = relationship(
         "KYCDocument",

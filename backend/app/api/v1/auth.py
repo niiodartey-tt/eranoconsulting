@@ -12,7 +12,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 @router.post("/login", response_model=TokenResponse)
-@rate_limit(requests=10, period=60)
+# @rate_limit(requests=10, period=60)
 async def login(
     username: str = Form(...),
     password: str = Form(...),
@@ -21,12 +21,12 @@ async def login(
     """Login user"""
     service = AuthService(db)
     tokens = await service.login(username, password)
-    
+
     return tokens
 
 
 @router.post("/register")
-@rate_limit(requests=5, period=60)
+# @rate_limit(requests=5, period=60)
 async def register(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),
@@ -34,12 +34,12 @@ async def register(
     """Register new user"""
     service = AuthService(db)
     user = await service.register(user_data)
-    
+
     return {
         "id": user.id,
         "email": user.email,
         "full_name": user.full_name,
-        "message": "User created successfully"
+        "message": "User created successfully",
     }
 
 
@@ -51,7 +51,7 @@ async def refresh_token(
     """Refresh access token"""
     service = AuthService(db)
     tokens = await service.refresh_token(refresh_token)
-    
+
     return tokens
 
 

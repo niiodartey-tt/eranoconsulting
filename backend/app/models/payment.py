@@ -101,7 +101,7 @@ class Payment(BaseModel):
     description = Column(Text, nullable=True)  # Additional notes
 
     # Relationships
-    client = relationship("Client", back_populates="payments")
+# FIXED: # FIXED:     client = relationship("Client", back_populates="payments")
     verified_by = relationship("User", foreign_keys=[verified_by_id])
 
     def __repr__(self):

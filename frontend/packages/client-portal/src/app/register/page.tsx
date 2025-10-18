@@ -95,7 +95,7 @@ export default function ClientRegistration() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/onboarding/register', {
+      const response = await fetch('http://localhost:8000/api/v1/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
