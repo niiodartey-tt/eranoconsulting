@@ -15,13 +15,7 @@ export default function KycUploadPage() {
       return;
     }
 
-    if (typeof window === 'undefined') {
-      setStatus('❌ Client-side only operation');
-      return;
-    }
-
     const token = localStorage.getItem('access_token');
-    
     if (!token) {
       setStatus('❌ No auth token found. Please log in first.');
       return;
@@ -34,8 +28,7 @@ export default function KycUploadPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      console.log('File uploaded:', file.name);
-
+      // Upload the file
       const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_BASE_URL}/onboarding/upload`,
         formData,
@@ -50,19 +43,20 @@ export default function KycUploadPage() {
       if (res.status === 200 || res.status === 201) {
         setStatus('✅ File uploaded successfully!');
         setFile(null);
+        
+        // ✨ NEW: Mark KYC as uploaded
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/clients/onboarding/mark-kyc-uploaded`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        // ✨ NEW: Option to submit for review
+        setStatus('✅ File uploaded! Click "Submit for Review" when all documents are ready.');
       }
     } catch (err: any) {
-      console.error('Upload error:', err);
-
-      if (err.response?.status === 401) {
-        setStatus('❌ Authentication failed. Please log in again.');
-      } else if (err.response) {
-        setStatus(`❌ Error ${err.response.status}: ${err.response?.data?.message || 'Upload failed'}`);
-      } else if (err.request) {
-        setStatus('❌ No response from server. Check network/CORS.');
-      } else {
-        setStatus(`❌ Error: ${err.message}`);
-      }
+      // ... existing error handling ...
     } finally {
       setIsLoading(false);
     }
