@@ -2,7 +2,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import List
+from typing import List, Optional
+import os
+from fastapi.responses import FileResponse
 import secrets
 import string
 
@@ -797,3 +799,121 @@ async def list_client_files_admin(
         client.id, client.business_name, folder_type
     )
     return files
+
+
+# ============================================================================
+# KYC APPROVAL/REJECTION ENDPOINTS
+# ============================================================================
+
+from pydantic import BaseModel
+from datetime import datetime, timezone
+
+class KYCReviewRequest(BaseModel):
+    """Request body for KYC review"""
+    notes: Optional[str] = None
+
+
+@router.post("/admin/kyc/{document_id}/approved")
+async def approve_kyc_document(
+    document_id: int,
+    review_data: KYCReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    """Approve a KYC document"""
+    # Get the document
+    result = await db.execute(
+        select(KYCDocument).where(KYCDocument.id == document_id)
+    )
+    kyc_doc = result.scalar_one_or_none()
+    
+    if not kyc_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="KYC document not found"
+        )
+    
+    # Update document status
+    kyc_doc.verification_status = "approved"
+    kyc_doc.verified_by_id = current_admin.id
+    kyc_doc.verification_date = datetime.now(timezone.utc)
+    kyc_doc.admin_comments = review_data.notes
+    
+    await db.commit()
+    
+    return {
+        "message": "Document approved successfully",
+        "document_id": document_id,
+        "status": "approved"
+    }
+
+
+@router.post("/admin/kyc/{document_id}/rejected")
+async def reject_kyc_document(
+    document_id: int,
+    review_data: KYCReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    """Reject a KYC document"""
+    # Get the document
+    result = await db.execute(
+        select(KYCDocument).where(KYCDocument.id == document_id)
+    )
+    kyc_doc = result.scalar_one_or_none()
+    
+    if not kyc_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="KYC document not found"
+        )
+    
+    # Update document status
+    kyc_doc.verification_status = "rejected"
+    kyc_doc.verified_by_id = current_admin.id
+    kyc_doc.verification_date = datetime.now(timezone.utc)
+    kyc_doc.rejection_reason = review_data.notes
+    kyc_doc.admin_comments = review_data.notes
+    
+    await db.commit()
+    
+    return {
+        "message": "Document rejected successfully",
+        "document_id": document_id,
+        "status": "rejected"
+    }
+
+
+# ============================================================================
+# FILE SERVING ENDPOINT
+# ============================================================================
+
+from fastapi.responses import FileResponse
+import os
+
+@router.get("/files/{file_path:path}")
+async def serve_file(
+    file_path: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Serve uploaded files with authorization"""
+    # Construct full file path
+    base_dir = "uploads"
+    full_path = os.path.join(base_dir, file_path)
+    
+    # Check if file exists
+    if not os.path.exists(full_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found"
+        )
+    
+    # TODO: Add authorization check - verify user has access to this file
+    # For now, any authenticated user can access
+    
+    return FileResponse(
+        path=full_path,
+        filename=os.path.basename(full_path),
+        media_type='application/octet-stream'
+    )

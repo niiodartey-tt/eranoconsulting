@@ -290,17 +290,35 @@ export default function KYCReviewPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                         </svg>
                         <p className="text-sm text-gray-600 mb-3">Preview not available</p>
-                        <a
-                          href={`${API_URL}${selectedDoc.file_path}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-medium text-sm"
+                        <button
+                          onClick={async () => {
+                            try {
+                              const token = localStorage.getItem('access_token');
+                              const response = await fetch(`${API_URL}/api/v1/onboarding/files/${selectedDoc.file_path}`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                              });
+                              if (!response.ok) throw new Error('Download failed');
+                              const blob = await response.blob();
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = selectedDoc.document_name;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              window.URL.revokeObjectURL(url);
+                            } catch (error) {
+                              console.error('Download error:', error);
+                              alert('Failed to download file');
+                            }
+                          }}
+                          className="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-medium text-sm cursor-pointer"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                           </svg>
                           Download & View
-                        </a>
+                        </button>
                       </div>
                     </div>
 
