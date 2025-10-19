@@ -30,6 +30,27 @@ export default function AdminUsersPage() {
     fetchUsers();
   }, []);
 
+
+  // Admin-only access control
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    
+    // Decode token to check role
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.role !== 'admin') {
+        router.push('/staff/dashboard'); // Redirect staff back to their dashboard
+        return;
+      }
+    } catch (error) {
+      router.push('/login');
+    }
+  }, [router]);
+
   async function fetchUsers() {
     try {
       const token = localStorage.getItem('access_token');
